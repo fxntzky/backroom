@@ -47,7 +47,7 @@ function App() {
       const { data, pose } = captureRef.current()
       const photo: Photograph = {
         id: crypto.randomUUID(), data, pose, room, createdAt: Date.now(),
-        location: room === 'baths' ? 'THE BATHS' : 'ENDLESS OFFICE',
+        location: room === 'baths' ? 'THE BATHS' : room === 'cloud' ? 'CLOUD CHAMBER' : 'ENDLESS OFFICE',
       }
       await storePhotograph(photo)
       setPhotos(previous => [...previous, photo])
@@ -107,12 +107,13 @@ function App() {
     <main className={`app mode-${mode}`}>
       <Experience active={active} mode={mode} room={room} travel={travel} photos={photos} onPosition={onPosition}
         onPrompt={setPrompt} onEnterBaths={() => changeRoom('baths')} onExitBaths={() => changeRoom('office')}
+        onEnterCloud={() => changeRoom('cloud')} onExitCloud={() => changeRoom('office')}
         onRevisit={revisit} registerCapture={registerCapture} />
       <div className="noise" aria-hidden="true" />
       <div className="vignette" aria-hidden="true" />
       {mode !== 'photo' && <header className="hud-header">
-        <div className="identity"><span className="identity-mark">B/</span><span>THE BACKROOM<br /><small>{mode === 'gallery' ? 'YOUR COLLECTION / 001' : 'EXPERIMENT 002'}</small></span></div>
-        <div className="status"><span className="indicator" /> {mode === 'gallery' ? 'THE GALLERY' : room === 'baths' ? 'THE BATHS' : 'ENVIRONMENT ACTIVE'}</div>
+        <div className="identity"><span className="identity-mark">B/</span><span>THE BACKROOM<br /><small>{mode === 'gallery' ? 'YOUR COLLECTION / 001' : 'EXPERIMENT 004'}</small></span></div>
+        <div className="status"><span className="indicator" /> {mode === 'gallery' ? 'THE GALLERY' : room === 'baths' ? 'THE BATHS' : room === 'cloud' ? 'CLOUD CHAMBER' : 'ENVIRONMENT ACTIVE'}</div>
       </header>}
       {active && mode !== 'photo' && <>
         <div className="crosshair" aria-hidden="true" />
@@ -130,9 +131,9 @@ function App() {
       </>}
       {!active && mode !== 'photo' && <div className="overlay" onClick={enter}>
         <section className="entry" onClick={event => event.stopPropagation()}>
-          <p className="eyebrow"><span className="indicator" /> {mode === 'gallery' ? 'A ROOM BUILT FROM YOUR PHOTOGRAPHS' : room === 'baths' ? 'A LIMINAL PHOTOGRAPHY EXPERIENCE / ROOM 001' : 'AN EXPLORABLE PHOTOGRAPHY EXPERIENCE'}</p>
-          <h1>{mode === 'gallery' ? <>YOUR<br /><em>GALLERY.</em></> : room === 'baths' ? <>THE<br /><em>BATHS.</em></> : <>FIND YOUR<br /><em>FRAME.</em></>}</h1>
-          <p className="description">{mode === 'gallery' ? `${photos.length} photographs. A collection shaped by the way you see.` : room === 'baths' ? 'A place where the water remains perfectly still.' : 'Explore a world. Photograph something more.'}</p>
+          <p className="eyebrow"><span className="indicator" /> {mode === 'gallery' ? 'A ROOM BUILT FROM YOUR PHOTOGRAPHS' : room === 'baths' ? 'A LIMINAL PHOTOGRAPHY EXPERIENCE / ROOM 001' : room === 'cloud' ? 'A LIMINAL PHOTOGRAPHY EXPERIENCE / ROOM 002' : 'AN EXPLORABLE PHOTOGRAPHY EXPERIENCE'}</p>
+          <h1>{mode === 'gallery' ? <>YOUR<br /><em>GALLERY.</em></> : room === 'baths' ? <>THE<br /><em>BATHS.</em></> : room === 'cloud' ? <>CLOUD<br /><em>CHAMBER.</em></> : <>FIND YOUR<br /><em>FRAME.</em></>}</h1>
+          <p className="description">{mode === 'gallery' ? `${photos.length} photographs. A collection shaped by the way you see.` : room === 'baths' ? 'A place where the water remains perfectly still.' : room === 'cloud' ? 'A room that forgot the difference between inside and outside.' : 'Explore a world. Photograph something more.'}</p>
           <button className="enter" type="button" onClick={enter}><span>{mode === 'gallery' ? 'ENTER GALLERY' : 'ENTER ENVIRONMENT'}</span><span>↗</span></button>
           {mode === 'gallery' && <button type="button" className="secondary-enter" onClick={() => switchMode('explore')}>← RETURN TO OFFICE</button>}
           <div className="instructions"><span>WASD / MOVE</span><span>MOUSE / LOOK</span><span>F / PHOTO MODE</span><span>G / GALLERY</span></div>

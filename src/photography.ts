@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 
-export type RoomId = 'office' | 'baths'
+export type RoomId = 'office' | 'baths' | 'cloud'
 export type CameraPose = { position: [number, number, number]; rotation: [number, number, number]; fov: number }
 export type Photograph = { id: string; data: string; createdAt: number; location: string; room?: RoomId; pose?: CameraPose }
 const DB_NAME = 'backroom-photographs-v1'

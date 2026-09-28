@@ -5,6 +5,7 @@ import { HALF, HEIGHT, CELL, canOccupy, world } from './world'
 import { carpetTexture, ceilingTexture, wallpaperTexture } from './textures'
 import { Gallery } from './Gallery'
 import { Baths, canWalkBaths } from './Baths'
+import { CloudChamber, canWalkCloud } from './CloudChamber'
 import { renderPhotograph, type Photograph, type RoomId, type CameraPose } from './photography'
 
 const EYE_HEIGHT = 1.64
@@ -129,6 +130,7 @@ function NearbyFluorescents() {
 type GameMode = 'explore' | 'photo' | 'gallery'
 type Travel = { id: number; room: RoomId; pose?: CameraPose }
 const OFFICE_PORTAL = new THREE.Vector2(0, -2.25)
+const CLOUD_PORTAL = new THREE.Vector2(0, 2.25)
 
 function Portal() {
   return <group position={[OFFICE_PORTAL.x, 0, OFFICE_PORTAL.y]}>
@@ -139,10 +141,19 @@ function Portal() {
   </group>
 }
 
-function Player({ active, mode, room, travel, photos, onPosition, onPrompt, onEnterBaths, onExitBaths, onRevisit }: {
+function CloudPortal() {
+  return <group position={[CLOUD_PORTAL.x, 0, CLOUD_PORTAL.y]} rotation={[0, Math.PI, 0]}>
+    <mesh position={[0, 1.62, 0]}><boxGeometry args={[2.05, 3.22, .16]} /><meshBasicMaterial color="#b7cad9" /></mesh>
+    <mesh position={[0, 1.62, .10]}><planeGeometry args={[1.66, 2.78]} /><meshBasicMaterial color="#e5f5ff" /></mesh>
+    <mesh position={[0, 3.34, .10]}><boxGeometry args={[2.35, .2, .27]} /><meshBasicMaterial color="#9aafbd" /></mesh>
+    <pointLight position={[0, 1.8, .65]} color="#dceeff" intensity={5} distance={4} decay={2} />
+  </group>
+}
+
+function Player({ active, mode, room, travel, photos, onPosition, onPrompt, onEnterBaths, onExitBaths, onEnterCloud, onExitCloud, onRevisit }: {
   active: boolean; mode: GameMode; room: RoomId; travel: Travel | null; photos: Photograph[]
   onPosition: (x: number, z: number) => void; onPrompt: (label: string) => void
-  onEnterBaths: () => void; onExitBaths: () => void; onRevisit: (photo: Photograph) => void
+  onEnterBaths: () => void; onExitBaths: () => void; onEnterCloud: () => void; onExitCloud: () => void; onRevisit: (photo: Photograph) => void
 }) {
   const { camera, gl, scene } = useThree()
   const keys = useRef(new Set<string>())
@@ -162,7 +173,7 @@ function Player({ active, mode, room, travel, photos, onPosition, onPrompt, onEn
     const freshTravel = !!travel && travel.id !== lastTravelId.current && travel.room === environment
     if (environmentRef.current !== environment || freshTravel) {
       const pose = freshTravel ? travel?.pose : undefined
-      const spawn: [number, number, number] = environment === 'gallery' ? [0, EYE_HEIGHT, 4.2] : environment === 'baths' ? [0, EYE_HEIGHT, 6.3] : [0, EYE_HEIGHT, 0]
+      const spawn: [number, number, number] = environment === 'gallery' ? [0, EYE_HEIGHT, 4.2] : (environment === 'baths' || environment === 'cloud') ? [0, EYE_HEIGHT, 6.3] : [0, EYE_HEIGHT, 0]
       camera.position.set(...(pose?.position ?? spawn))
       yaw.current = pose?.rotation[1] ?? 0
       pitch.current = pose?.rotation[0] ?? 0
@@ -193,6 +204,8 @@ function Player({ active, mode, room, travel, photos, onPosition, onPrompt, onEn
         if (mode === 'gallery' && target.current) onRevisit(target.current)
         else if (room === 'office' && mode === 'explore' && nearby.current === 'baths') onEnterBaths()
         else if (room === 'baths' && mode === 'explore' && nearby.current === 'exit') onExitBaths()
+        else if (room === 'office' && mode === 'explore' && nearby.current === 'cloud') onEnterCloud()
+        else if (room === 'cloud' && mode === 'explore' && nearby.current === 'exit') onExitCloud()
       }
     }
     const onKeyUp = (event: KeyboardEvent) => keys.current.delete(event.code)
@@ -228,7 +241,7 @@ function Player({ active, mode, room, travel, photos, onPosition, onPrompt, onEn
       window.removeEventListener('mousemove', onMouseMove)
       window.removeEventListener('blur', clear)
     }
-  }, [camera, gl, mode, active, room, onRevisit, onEnterBaths, onExitBaths])
+  }, [camera, gl, mode, active, room, onRevisit, onEnterBaths, onExitBaths, onEnterCloud, onExitCloud])
 
   useFrame((_, delta) => {
     if (!active) { if (nearby.current !== '') { nearby.current = ''; onPrompt('') }; return }
@@ -243,13 +256,14 @@ function Player({ active, mode, room, travel, photos, onPosition, onPrompt, onEn
         if (target.current?.pose && target.current.room) candidate = 'E — ENTER PHOTOGRAPH'
       }
     } else if (mode === 'explore' && room === 'office') {
-      if (Math.hypot(camera.position.x - OFFICE_PORTAL.x, camera.position.z - OFFICE_PORTAL.y) < 2.5) candidate = 'baths'
-    } else if (mode === 'explore' && room === 'baths') {
+      if (Math.hypot(camera.position.x - OFFICE_PORTAL.x, camera.position.z - OFFICE_PORTAL.y) < 1.4) candidate = 'baths'
+      else if (Math.hypot(camera.position.x - CLOUD_PORTAL.x, camera.position.z - CLOUD_PORTAL.y) < 1.4) candidate = 'cloud'
+    } else if (mode === 'explore' && (room === 'baths' || room === 'cloud')) {
       if (camera.position.z > 9.2 && Math.abs(camera.position.x) < 2.5) candidate = 'exit'
     }
     if (candidate !== nearby.current) {
       nearby.current = candidate
-      onPrompt(candidate === 'baths' ? 'E — ENTER THE BATHS' : candidate === 'exit' ? 'E — RETURN TO OFFICE' : candidate)
+      onPrompt(candidate === 'baths' ? 'E — ENTER THE BATHS' : candidate === 'cloud' ? 'E — ENTER CLOUD CHAMBER' : candidate === 'exit' ? 'E — RETURN TO OFFICE' : candidate)
     }
     if (mode === 'photo') return
     const held = keys.current
@@ -265,7 +279,7 @@ function Player({ active, mode, room, travel, photos, onPosition, onPrompt, onEn
     const dz = (-cos * forward - sin * strafe) * speed
     const canWalk = (x: number, z: number) => mode === 'gallery'
       ? Math.abs(x) < 7.8 && Math.abs(z) < 6.3
-      : room === 'baths' ? canWalkBaths(x, z) : canOccupy(x, z)
+      : room === 'baths' ? canWalkBaths(x, z) : room === 'cloud' ? canWalkCloud(x, z) : canOccupy(x, z)
     if (canWalk(camera.position.x + dx, camera.position.z)) camera.position.x += dx
     if (canWalk(camera.position.x, camera.position.z + dz)) camera.position.z += dz
     positionReport.current += delta
@@ -286,6 +300,9 @@ function Atmosphere({ mode, room }: { mode: GameMode; room: RoomId }) {
     } else if (room === 'baths') {
       scene.background = new THREE.Color('#9cb7b1')
       scene.fog = new THREE.Fog('#9cb7b1', 12, 37)
+    } else if (room === 'cloud') {
+      scene.background = new THREE.Color('#c4d8e5')
+      scene.fog = new THREE.FogExp2('#c4d8e5', .027)
     } else {
       scene.background = new THREE.Color('#353327')
       scene.fog = new THREE.Fog('#353327', 20, 67)
@@ -304,7 +321,7 @@ function PhotographBridge({ register }: { register: (capture: (() => { data: str
   return null
 }
 
-export function Experience({ active, mode, room, travel, photos, onPosition, onPrompt, onEnterBaths, onExitBaths, onRevisit, registerCapture }: {
+export function Experience({ active, mode, room, travel, photos, onPosition, onPrompt, onEnterBaths, onExitBaths, onEnterCloud, onExitCloud, onRevisit, registerCapture }: {
   active: boolean
   mode: GameMode
   room: RoomId
@@ -314,6 +331,8 @@ export function Experience({ active, mode, room, travel, photos, onPosition, onP
   onPrompt: (label: string) => void
   onEnterBaths: () => void
   onExitBaths: () => void
+  onEnterCloud: () => void
+  onExitCloud: () => void
   onRevisit: (photo: Photograph) => void
   registerCapture: (capture: (() => { data: string; pose: CameraPose }) | null) => void
 }) {
@@ -324,16 +343,17 @@ export function Experience({ active, mode, room, travel, photos, onPosition, onP
       gl={{ antialias: true, powerPreference: 'high-performance', preserveDrawingBuffer: false }}
       onCreated={({ scene }) => { scene.background = new THREE.Color('#353327'); scene.fog = new THREE.Fog('#353327', 20, 67) }}
     >
-      {mode === 'gallery' ? <Gallery photos={photos} /> : room === 'baths' ? <Baths /> : <>
+      {mode === 'gallery' ? <Gallery photos={photos} /> : room === 'baths' ? <Baths /> : room === 'cloud' ? <CloudChamber /> : <>
         <hemisphereLight args={['#f7efcd', '#746c56', 1.35]} />
         <ambientLight intensity={.38} />
         <Architecture />
         <NearbyFluorescents />
         <Portal />
+        <CloudPortal />
       </>}
       <Atmosphere mode={mode} room={room} />
       <Player active={active} mode={mode} room={room} travel={travel} photos={photos} onPosition={onPosition}
-        onPrompt={onPrompt} onEnterBaths={onEnterBaths} onExitBaths={onExitBaths} onRevisit={onRevisit} />
+        onPrompt={onPrompt} onEnterBaths={onEnterBaths} onExitBaths={onExitBaths} onEnterCloud={onEnterCloud} onExitCloud={onExitCloud} onRevisit={onRevisit} />
       <PhotographBridge register={registerCapture} />
     </Canvas>
   )
